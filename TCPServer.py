@@ -1,5 +1,5 @@
 # Generally use own TCP server when writing command shells or making a proxy
-# Mulit-threaded TCP server
+# Multi-threaded TCP server
 
 import socket
 import threading
@@ -33,6 +33,7 @@ def handle_client(client_socket):
 
 
 while True:
+    # client socket and remote connection details
     client, addr = server.accept()
 
     print("[*] Accepted connection from: %s:%d" % (addr[0], addr[1]))

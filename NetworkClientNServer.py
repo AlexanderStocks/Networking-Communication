@@ -194,6 +194,7 @@ def client_handler(client_socket):
         client_socket.send(output)
 
     # if command shell requested go into another loop
+    # If writing python client to speak to this functions, remember newline character
     if command:
         while True:
             # show a prompt
@@ -205,3 +206,4 @@ def client_handler(client_socket):
 
             response = run_command(cmd_buffer)
             client_socket.send(response)
+

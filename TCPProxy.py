@@ -48,7 +48,7 @@ def main():
     remote_port = int(sys.argv[4])
 
     # tells proxy to connect and receive data
-    receive_first = sys.argv[5] == "True"
+    receive_first = "True" in sys.argv[5]
 
     # start up listening socket
     server_loop(local_host, local_port, remote_host, remote_port, receive_first)
@@ -110,7 +110,7 @@ def proxy_handler(client_socket, remote_host, remote_port, receive_first):
 # output packet details in hex and ascii
 def hexdump(src, length=16):
     result = []
-    digits = 4 if isinstance(src, unicode) else 2
+    digits = 4 if isinstance(src, str) else 2
     for i in range(0, len(src), length):
         s = src[i:i + length]
         hexa = b' '.join(["%0*X" % (digits, ord(x)) for x in s])

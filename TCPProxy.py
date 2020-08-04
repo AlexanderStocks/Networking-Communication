@@ -121,6 +121,9 @@ def hexdump(src, length=16):
 
 
 # increase timeout when recieving from lossy networks
+# Used to receive local and remote data, pass in socket object
+# Two second timeout to be increased if proxying traffic over long distances or over lossy networks
+# Handles receiving data until more data is sent from other end of connection
 def receive_from(connection):
     buffer = " "
     connection.settimeout(2)
@@ -137,7 +140,7 @@ def receive_from(connection):
 
     return buffer
 
-
+# These two
 def request_handler(buffer):
     # Perform any changes here
     return buffer

@@ -20,7 +20,7 @@ print("[*] Listening on %s:%d" % (bind_ip, bind_port))
 
 
 # Client handling thread
-def handle_client(client_socket):
+def clientHandler(client_socket):
     # print data client sends
     request = client_socket.recv(1024)
 
@@ -39,5 +39,5 @@ while True:
     print("[*] Accepted connection from: %s:%d" % (addr[0], addr[1]))
 
     # Create a thread that points to handle client function, pass client socket
-    client_handler = threading.Thread(target=handle_client, args=(client,))
+    client_handler = threading.Thread(target=clientHandler, args=(client,))
     client_handler.start()

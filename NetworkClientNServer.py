@@ -4,66 +4,52 @@ import getopt
 import threading
 import subprocess
 
-# Subprocess gives proccess-creation interface that enables us to start and interact with client programs
+# Subprocess gives process-creation interface that enables us to start and interact with client programs
 
 
 # 4096 used commonly as a buffer size
 from TCPServer import client_handler
 
-listen = False
-command = False
-upload = False
+listening = False
+cmd = False
+send = False
 execute = ""
 target = ""
-upload_destination = ""
+send_destination = ""
 port = 0
 
 
-#####################Functions for command line arguments and calling others#################################
-def usage():
-    print("BHP Net Tool")
-    print()
-    print("Usage: bhpnet.py -t target_host -p port")
-    print("-l --listen              - listen on [host]:[port] for incoming connections")
-    print("-e --execute=file_to_run - execute the given file upon receiving a connection")
-    print("-c --comand              - initialise a command shell")
-    print("-u --upload=destination  - upon recieving connection upload a file and write to [destination]")
-    print()
-    print()
-    print("Examples: ")
-    print("bhpnet.py -t 192.168.0.1 -p 5555 -l -u=c:\\target.exe")
-    print("ehco 'ABCDEFGHI' | ./bhpnet.py -t 192.168.11.12 -p 135")
-    sys.exit(0)
-
+#####################Functions for cmd line arguments and calling others#################################
 
 def main():
-    global listen
+    global listening
     global port
     global execute
-    global command
-    global upload_destination
+    global cmd
+    global send_destination
     global target
+
     # if there are no arguments
     if not len(sys.argv[1:]):
-        usage()
+        howToUse()
 
-    # read the command line options
+    # read the cmd line options
     try:
-        optval, args = getopt.getopt(sys.argv[1:], "hle:t:p:cu:",
-                                     ["help", "listen", "execute", "target", "port", "command", "upload"])
-    except getopt.GetoptError as err:
-        print(str(err))
-        usage()
+        maybeVal, args = getopt.getopt(sys.argv[1:], "hle:t:p:cu:",
+                                     ["help", "listening", "execute", "target", "port", "cmd", "upload"])
+    except getopt.GetoptError as e:
+        print(str(e))
+        howToUse()
 
-    for o, a in optval:
+    for o, a in maybeVal:
         if o in ("-h", "--help"):
-            usage()
-        elif o in ("-l", "--listen"):
-            listen = True
+            howToUse()
+        elif o in ("-l", "--listening"):
+            listening = True
         elif o in ("-e", "--execute"):
             execute = a
         elif o in ("-u", "--upload"):
-            upload_destination = a
+            send_destination = a
         elif o in ("-t", "--target"):
             target = a
         elif o in ("-p", "--port"):
@@ -71,16 +57,16 @@ def main():
         else:
             assert False, "Unsupported Option"
 
-    if not listen and len(target) and port > 0:
-        # read into buffer from commandline
+    if not listening and len(target) and port > 0:
+        # read into buffer from cmdline
         # if not sending input use CTRL-D because will block
         buffer = sys.stdin.read()
 
         # send data
         client_sender(buffer)
 
-    if listen:
-        # setup a listening socket and process commands (upload a file, execute a command, start a command shell)
+    if listening:
+        # setup a listening socket and process cmds (send a file, execute a cmd, start a cmd shell)
         server_loop()
 
 
@@ -114,7 +100,7 @@ def client_sender(buffer):
             # wait for next input
             buffer = input("")
 
-            # new line used so client compatible with command shell
+            # new line used so client compatible with cmd shell
             buffer += "\n"
 
             client.send(buffer)
@@ -128,13 +114,13 @@ def client_sender(buffer):
 
 def server_loop():
     global target
-    # if no target given, listen on all interfaces
+    # if no target given, listening on all interfaces
     if not len(target):
         target = "0.0.0.0"
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((target, port))
-    server.listen(5)
+    server.listening(5)
 
     while True:
         client_socket, addr = server.accept()
@@ -143,25 +129,38 @@ def server_loop():
         client_thread.start()
 
 
-def run_command(command):
-    command = command.rstrip()
+def run_cmd(cmd):
+    cmd = cmd.rstrip()
     try:
-        output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
+        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
     except:
         output = "Failed to execute commmand. \r\n"
 
     # send the output back to the client
     return output
 
-######################################Logic for file uploads, command execution and shell###############################
+def howToUse():
+    print("howToUse: NetworkClientNServer.py -t target_host -p port")
+    print("-h --help                   - bring up manual ")
+    print("-l --listening              - listening on [host]:[port] for incoming connections")
+    print("-e --execute=file_to_run    - execute the given file upon receiving a connection")
+    print("-c --command                - initialise a cmd shell")
+    print("-u --upload=destination     - upon receiving connection upload a file and write to [destination]")
+    print()
+    print("E.g. ")
+    print("NetworkClientNServer.py -t 192.168.0.1 -p 5555 -l -u=c:\\target.exe")
+    print("ehco 'ABCDEFGHI' | ./NetworkClientNServer.py -t 192.168.0.1 -p 5555")
+    sys.exit(0)
+
+######################################Logic for file sends, cmd execution and shell###############################
 
 def client_handler(client_socket):
-    global upload
+    global send
     global execute
-    global command
+    global cmd
 
-    # check if theres an upload
-    if len(upload_destination):
+    # check if theres an send
+    if len(send_destination):
 
         # read in the bytes adn write to the destination
         file_buffer = ""
@@ -177,33 +176,33 @@ def client_handler(client_socket):
 
         # write out the bytes
         try:
-            file_descriptor = open(upload_destination, "wb")
+            file_descriptor = open(send_destination, "wb")
             file_descriptor.write(file_buffer)
             file_descriptor.close()
 
             # send acknowledgement
-            client_socket.send("Successfully saved file to %s\r\n" % upload_destination)
+            client_socket.send("Successfully saved file to %s\r\n" % send_destination)
         except:
-            client_socket.send("Failed to save file to %s\r\n" % upload_destination)
+            client_socket.send("Failed to save file to %s\r\n" % send_destination)
 
-    # check for command execution
+    # check for cmd execution
     if len(execute):
-        # run command
-        output = run_command(execute)
+        # run cmd
+        output = run_cmd(execute)
 
         client_socket.send(output)
 
-    # if command shell requested go into another loop
+    # if cmd shell requested go into another loop
     # If writing python client to speak to this functions, remember newline character
-    if command:
+    if cmd:
         while True:
             # show a prompt
             client_socket.send("<BHP:#> ")
-            # recieve until newline char
+            # receive until newline char
             cmd_buffer = ""
             while "\n" not in cmd_buffer:
                 cmd_buffer += client_socket.recv(1024)
 
-            response = run_command(cmd_buffer)
+            response = run_cmd(cmd_buffer)
             client_socket.send(response)
 

@@ -6,36 +6,36 @@ import socket
 import threading
 
 
-def server_loop(local_host, local_port, remote_host, remote_port, receive_first):
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+def listen(local_host, local_port, otherHost, otherPort, receiving):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     try:
-        server.bind((local_host, local_port))
-    except:
+        sock.bind((local_host, local_port))
+    except OSError:
         print("[!!] Failed to listen on %s:%d" % (local_host, local_port))
         print("[!!] Check for other listening sockets or correct permissions.")
         sys.exit(0)
 
     print("[*] Listening on %s:%d" % (local_host, local_port))
 
-    server.listen(5)
+    sock.listen(5)
 
     while True:
-        client_socket, addr = server.accept()
+        clientSock, addr = sock.accept()
 
         # print out the local connection information
         print("[-->] Recieved incoming connection from %s:%d" % (addr[0], addr[1]))
 
         # start a thread to talk to the remote host
-        proxy_thread = threading.Thread(target=proxy_handler,
-                                        args=(client_socket, remote_host, remote_port, receive_first))
+        thread = threading.Thread(target=proxy,
+                                  args=(clientSock, otherHost, otherPort, receiving))
 
-        proxy_thread.start()
+        thread.start()
 
 
 def main():
     if len(sys.argv[1:]) != 5:
-        print("Usage: ./TCPProxy.py [localhost] [localport] [remotehost] [remoteport] [receive_first]")
+        print("Usage: ./TCPProxy.py [localhost] [localport] [remotehost] [remoteport] [receiving]")
         print("Example ./TCPProxy.py 127.0.0.1 135 8.8.8.8 443 True")
         sys.exit(0)
 
@@ -44,71 +44,71 @@ def main():
     local_port = int(sys.argv[2])
 
     # remote target parameters
-    remote_host = sys.argv[3]
-    remote_port = int(sys.argv[4])
+    otherHost = sys.argv[3]
+    otherPort = int(sys.argv[4])
 
     # tells proxy to connect and receive data
-    receive_first = "True" in sys.argv[5]
+    receiving = "True" in sys.argv[5]
 
     # start up listening socket
-    server_loop(local_host, local_port, remote_host, remote_port, receive_first)
+    listen(local_host, local_port, otherHost, otherPort, receiving)
 
 
 main()
 
 
-def proxy_handler(client_socket, remote_host, remote_port, receive_first):
+def proxy(clientSock, otherHost, otherPort, receiving):
     # connect to remote host
-    remote_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    remote_socket.connect((remote_host, remote_port))
+    otherSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    otherSock.connect((otherHost, otherPort))
 
     # check dont need to initiate a connection to remote side and request data before going into main loop
-    if receive_first:
+    if receiving:
         # takes a connected socket object and performs a receive
-        remote_buffer = receive_from(remote_socket)
+        otherBuffer = getData(otherSock)
         # dump contents of the packet for inspection
-        hexdump(remote_buffer)
+        hexDump(otherBuffer)
 
-        remote_buffer = response_handler(remote_buffer)
+        otherBuffer = response_handler(otherBuffer)
 
-        if len(remote_buffer):
-            print("[<--] Sending %d bytes to localhost." % len(remote_buffer))
-            client_socket.send(remote_buffer)
+        if len(otherBuffer):
+            print("[<--] Sending %d bytes to localhost." % len(otherBuffer))
+            clientSock.send(otherBuffer)
 
     while True:
-        local_buffer = receive_from(client_socket)
+        thisBuffer = getData(clientSock)
 
-        if len(local_buffer):
-            print("[-->] Received %d bytes from localhost." % len(local_buffer))
-            hexdump(local_buffer)
+        if len(thisBuffer):
+            print("[-->] Received %d bytes from localhost." % len(thisBuffer))
+            hexDump(thisBuffer)
 
-            local_buffer = request_handler(local_buffer)
+            thisBuffer = request_handler(thisBuffer)
 
-            remote_socket.send(local_buffer)
+            otherSock.send(thisBuffer)
             print("[-->] Sent to remote.")
 
-            remote_buffer = receive_from(remote_socket)
+            otherBuffer = getData(otherSock)
 
-            if len(remote_buffer):
-                print("[<--] Received %d bytes from remote." % len(remote_buffer))
-                hexdump(remote_buffer)
+            if len(otherBuffer):
+                print("[<--] Received %d bytes from remote." % len(otherBuffer))
+                hexDump(otherBuffer)
 
-                remote_buffer = response_handler(remote_buffer)
+                otherBuffer = response_handler(otherBuffer)
 
-                client_socket.send(remote_buffer)
+                clientSock.send(otherBuffer)
 
                 print("[<--] Sent to localhost.")
 
-            if not len(local_buffer) or not len(remote_buffer):
-                client_socket.close()
-                remote_socket.close()
+            if not len(thisBuffer) or not len(otherBuffer):
+                clientSock.close()
+                otherSock.close()
                 print("[*] No more data. Closing connections.")
 
                 break
 
 
 # output packet details in hex and ascii
-def hexdump(src, length=16):
+def hexDump(src, length=16):
     result = []
     digits = 4 if isinstance(src, str) else 2
     for i in range(0, len(src), length):
@@ -120,11 +120,11 @@ def hexdump(src, length=16):
     print(b'\n'.join(result))
 
 
-# increase timeout when recieving from lossy networks
+# increase timeout when receiving from lossy networks
 # Used to receive local and remote data, pass in socket object
 # Two second timeout to be increased if proxying traffic over long distances or over lossy networks
 # Handles receiving data until more data is sent from other end of connection
-def receive_from(connection):
+def getData(connection):
     buffer = " "
     connection.settimeout(2)
 
@@ -139,6 +139,7 @@ def receive_from(connection):
         pass
 
     return buffer
+
 
 # These two
 def request_handler(buffer):

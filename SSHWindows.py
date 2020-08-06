@@ -19,7 +19,7 @@ def ssh_command(ip, user, passwd, command):
             try:
                 cmd_output = subprocess.check_output(command, shell=True)
                 ssh_session.send(cmd_output)
-            except Exception as e:
+            except OSError as e:
                 ssh_session.send(str(e))
     client.close()
     return
